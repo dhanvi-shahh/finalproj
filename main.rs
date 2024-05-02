@@ -3,6 +3,7 @@ use std::{error::Error};
 use std::fs::File;
 use polars::prelude::CsvReader;
 use std::collections::HashMap;
+use rand::prelude::SliceRandom;
 
 pub type dailyprice = Vec<(String, f64)>;
 pub type allprices = HashMap<String, Vec<f64>>;
@@ -56,6 +57,28 @@ fn createadjlist(dailyprice: dailyprice) -> edges{
   edges
 }
 
+fn furthest(edges: edges) -> HashMap<String, String>{
+  let mut farneigh: HashMap<String, String> = HashMap::new();
+  for asset in edges.keys(){
+    let original:String = asset.to_string(); 
+    let first:String = original.clone();
+    let mut current: String = edges[&first].choose(&mut rand::thread_rng()).unwrap().to_string();
+
+    let visitedneigh = edges.get(&original);
+    for _ in 0..20{
+      let prevneigh:&String = &current.clone();
+      if edges.contains_key(&current) && !visitedneigh.expect("should have").contains(&current){
+        current = edges[&current].choose(&mut rand::thread_rng()).unwrap().to_string();
+      }
+      else{
+        current.clone();
+      }
+    }
+    farneigh.insert(asset.to_string(), current.to_string());
+  }
+  farneigh
+}
+
 #[derive(Debug)]
 pub struct Graph{
   n:usize, 
@@ -68,23 +91,31 @@ impl Graph{
     Graph {n, vertices, adjlist: HashMap::new()}
   }
 
-  //fn undirected(n: usize, vertices: Vec<(String, f64)>) -> Graph{
-    //let mut graph = Graph{n, vertices};
-    //graph.vertices.sort_by(|a, b| a.0.cmp(&b.0));
-    //graph
-  //}
-}
+  fn undirected(n: usize, vertices: Vec<(String, f64)>, adjlist: HashMap<String, Vec<String>>) -> Graph{
+    let mut graph = Graph{n, vertices, adjlist};
+    graph.vertices.sort_by(|a, b| a.0.cmp(&b.0));
+    graph
+  }
 
-//fn dailyexpect(dailyprices) -> (posret, negret){
-  //let (posret, negret): 
-//}
+
+fn dailyexpect(&self) -> (Vec<(String, f64)>, Vec<(String, f64)>){
+  let (posret, negret): (Vec<_>, Vec<_>) =
+    self.vertices.clone()
+    .into_iter()
+    .partition(|&(_, value)| value >= 0.0);
+  (posret, negret)
+}
+}
 
 fn main() {
   let path = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\project\daily_asset_prices.csv";
   let (allprices, dailyprice) = read(path).expect("Couldn't Read!");
-  let adjlist = createadjlist(dailyprice.clone());
+  let adjacency = createadjlist(dailyprice.clone());
+  let far = furthest(adjacency.clone());
+  //println!("{:?}", far);
   let n = dailyprice.len();
-  let graph = Graph::new(n, dailyprice.clone(), adjlist.clone());
-  println!("{:?}", adjlist);
+  let graph = Graph::new(n, dailyprice.clone(), adjacency.clone());
+  let (positive, negative) = graph.dailyexpect();
+  println!("{:?}", positive)
 }
 
