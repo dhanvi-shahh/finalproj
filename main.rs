@@ -1,26 +1,26 @@
 use std::{error::Error};
-//use polars::prelude::*;
+use ndarray::prelude::*;
+use ndarray::array;
 use std::fs::File;
 use polars::prelude::CsvReader;
 use std::collections::HashMap;
 use rand::prelude::SliceRandom;
 
-pub type dailyprice = Vec<(String, f64)>;
-pub type allprices = HashMap<String, Vec<f64>>;
+pub type nodes = Vec<(String, f64)>;
+pub type assetprices = HashMap<String, Vec<f64>>;
 pub type edges = HashMap<String, Vec<String>>;
 
 fn read(path:&str) -> Result<(HashMap<String, Vec<f64>>, Vec<(String, f64)>), Box<dyn Error>>{
     let file = File::open(path)?;
     let mut rdr = csv::Reader::from_reader(file);  
     let datapoints: Vec<_> = rdr.records().collect::<Result<_, _>>()?;  
-    let mut dailyprice: Vec<(String, f64)> = Vec::new();
-    let mut allprices = HashMap::new();
+    let mut nodes: Vec<(String, f64)> = Vec::new();
+    let mut assetprices = HashMap::new();
     let baseline = datapoints.last().unwrap();
     let headers = rdr.headers()?.clone();
     let sample = datapoints.iter().step_by(30);
     for result in sample{
         let record = result;
-        //println!("{:?}", record);
         let date = record.get(0).unwrap();
         for index in 1..record.len(){
           let base = baseline.get(index).unwrap_or("Base Not Readable").parse::<f64>()?;
@@ -30,48 +30,51 @@ fn read(path:&str) -> Result<(HashMap<String, Vec<f64>>, Vec<(String, f64)>), Bo
             .parse::<f64>()?;
           let logvalue: f64 = (value/base).ln();
           let label = format!("{:?}, {:?}", date, asset);
-          allprices.entry(asset).or_insert_with(Vec::new).push(logvalue);
-          dailyprice.push((label, logvalue.into()));
+         assetprices.entry(asset).or_insert_with(Vec::new).push(logvalue);
+          nodes.push((label, logvalue.into()));
         }
     }
-    //println!("{:?}", dailyprice);
-    //println!("{:?}", allprices);
-    Ok((allprices, dailyprice))
+    Ok((assetprices, nodes))
 }
 
-fn createadjlist(dailyprice: dailyprice) -> edges{
+
+fn createadjlist(nodes: nodes, threshold:f64, n:usize) -> (edges, Vec<Vec<bool>>){
   let mut edges = HashMap::new();
-  for (i, (ilabel, ivalue)) in dailyprice.iter().enumerate(){
-    for (j, (jlabel, jvalue)) in dailyprice.iter().enumerate(){
+  let mut adjmat = vec![vec![false;n];n];
+  for (i, (ilabel, ivalue)) in nodes.iter().enumerate(){
+    for (j, (jlabel, jvalue)) in nodes.iter().enumerate(){
       if i==j{
+        adjmat[i][j]= true;
         continue;
       }
-      else {
-        let similarity = (((ivalue) - (jvalue)).abs())/(ivalue);
-        if similarity > 99.99{
+      else{
+        let dprod = ivalue *jvalue;
+        let v1mag = (ivalue*ivalue).sqrt();
+        let v2mag = (jvalue *jvalue).sqrt();
+        let corr = dprod/(v1mag + v2mag);
+        if corr > threshold {
           edges.entry(ilabel.to_string()).or_insert_with(Vec::new).push(jlabel.to_string());
+          adjmat[i][j] = true;
+        }
       }
     }
-    }
   }
-  edges
+  (edges, adjmat)
 }
 
 fn furthest(edges: edges) -> HashMap<String, String>{
   let mut farneigh: HashMap<String, String> = HashMap::new();
   for asset in edges.keys(){
     let original:String = asset.to_string(); 
-    let first:String = original.clone();
-    let mut current: String = edges[&first].choose(&mut rand::thread_rng()).unwrap().to_string();
-
-    let visitedneigh = edges.get(&original);
+    let mut step: String = edges[&original].choose(&mut rand::thread_rng()).unwrap().to_string();
+    let mut current = step.clone();
+    let mut visitedneigh: Vec<String> = Vec::new();
+    visitedneigh.push(current.clone());
     for _ in 0..20{
-      let prevneigh:&String = &current.clone();
-      if edges.contains_key(&current) && !visitedneigh.expect("should have").contains(&current){
-        current = edges[&current].choose(&mut rand::thread_rng()).unwrap().to_string();
-      }
-      else{
-        current.clone();
+      step = edges[&current].choose(&mut rand::thread_rng()).unwrap().to_string();
+      if edges.contains_key(&step) && !visitedneigh.contains(&step){
+        current = step.clone();
+        visitedneigh.push(current.clone());
       }
     }
     farneigh.insert(asset.to_string(), current.to_string());
@@ -82,7 +85,7 @@ fn furthest(edges: edges) -> HashMap<String, String>{
 #[derive(Debug)]
 pub struct Graph{
   n:usize, 
-  vertices: dailyprice, 
+  vertices: nodes, 
   adjlist: edges, 
 }
 
@@ -97,25 +100,34 @@ impl Graph{
     graph
   }
 
-
-fn dailyexpect(&self) -> (Vec<(String, f64)>, Vec<(String, f64)>){
-  let (posret, negret): (Vec<_>, Vec<_>) =
-    self.vertices.clone()
-    .into_iter()
-    .partition(|&(_, value)| value >= 0.0);
-  (posret, negret)
-}
+  fn dailyexpect(&self) -> (Vec<(String, f64)>, Vec<(String, f64)>){
+    let (posret, negret): (Vec<_>, Vec<_>) =
+      self.vertices.clone()
+      .into_iter()
+      .partition(|&(_, value)| value >= 0.0);
+    (posret, negret)
+  }
 }
 
 fn main() {
   let path = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\project\daily_asset_prices.csv";
-  let (allprices, dailyprice) = read(path).expect("Couldn't Read!");
-  let adjacency = createadjlist(dailyprice.clone());
-  let far = furthest(adjacency.clone());
+  let (assetprices, nodes) = read(path).expect("Couldn't Read!");
+  let n = nodes.len();
+  let (adjlist, adjmat) = createadjlist(nodes.clone(), 0.5, n);
+  println!{"{:?}", adjlist};
+  let far = furthest(adjlist.clone());
   //println!("{:?}", far);
-  let n = dailyprice.len();
-  let graph = Graph::new(n, dailyprice.clone(), adjacency.clone());
+  let graph = Graph::new(n, nodes.clone(), adjlist.clone());
   let (positive, negative) = graph.dailyexpect();
-  println!("{:?}", positive)
 }
 
+#[test]
+fn test(){
+  let path = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\final_proj\final proj test.csv";
+  let (all, daily) = read(path).expect("Couldn't Read");
+  let n = daily.len();
+  let (adjlisttest, adjmattest)  = createadjlist(daily.clone(), 0.05, n);
+  let far_test = furthest(adjlisttest.clone());
+  println!("{:?}", far_test);
+  assert_eq(far_test)
+}
