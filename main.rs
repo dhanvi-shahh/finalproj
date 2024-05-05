@@ -64,13 +64,12 @@ fn main() {
   let (_Assetprices, Nodes) = read(path).expect("Couldn't Read!");
   let n = Nodes.len();
   let (adjmap, adjmat) = adjacent::createadj(Nodes.clone(), 0.1, n);
-  println!("{:?}", adjmap);
   let far = recommend(adjmap.clone(), 7);
   let mut graph = Graph::new(n, Nodes.clone(), adjmap.clone(), adjmat.clone());
   let graph = graph.undirected();
   let (positive, negative) = graph.dailyexpect(0.0);
-  //graph.portfolio();
-  //graph.groups();
+  graph.portfolio();
+  graph.groups();
 }
 
 #[test]
