@@ -26,11 +26,11 @@ impl Graph{
     self
   }
 
-  pub fn dailyexpect(&self) -> (Vec<(String, f64)>, Vec<(String, f64)>){
+  pub fn dailyexpect(&self, thres: f64) -> (Vec<(String, f64)>, Vec<(String, f64)>){
     let (posret, negret): (Vec<_>, Vec<_>) =
       self.vertices.clone()
       .into_iter()
-      .partition(|&(_, value)| value >= 0.0);
+      .partition(|&(_, value)| value >= thres);
     (posret, negret)
   }
 
@@ -52,6 +52,7 @@ impl Graph{
     }
   }
   pub fn portfolio(&self){
+    let i =2;
     for i in 0..self.n{
       println!("Distance from Asset {}", self.vertices[i].0);
       self.risk(i);

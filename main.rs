@@ -28,7 +28,7 @@ fn read(path:&str) -> Result<(HashMap<String, Vec<f64>>, Vec<(String, f64)>), Bo
             .parse::<f64>()?;
           let logvalue: f64 = (value/base).ln();
           let label = format!("{:?}, {:?}", date, asset);
-         Assetprices.entry(asset).or_insert_with(Vec::new).push(logvalue);
+          Assetprices.entry(asset).or_insert_with(Vec::new).push(logvalue);
           Nodes.push((label, logvalue.into()));
         }
     }
@@ -64,11 +64,13 @@ fn main() {
   let (_Assetprices, Nodes) = read(path).expect("Couldn't Read!");
   let n = Nodes.len();
   let (adjmap, adjmat) = adjacent::createadj(Nodes.clone(), 0.1, n);
+  println!("{:?}", adjmap);
   let far = recommend(adjmap.clone(), 7);
-  let graph = Graph::new(n, Nodes.clone(), adjmap.clone(), adjmat.clone());
-  let (positive, negative) = graph.dailyexpect();
-  graph.portfolio();
-  graph.groups();
+  let mut graph = Graph::new(n, Nodes.clone(), adjmap.clone(), adjmat.clone());
+  let graph = graph.undirected();
+  let (positive, negative) = graph.dailyexpect(0.0);
+  //graph.portfolio();
+  //graph.groups();
 }
 
 #[test]
@@ -76,11 +78,22 @@ fn test(){
   let testpath = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\final_proj\final proj test.csv";
   let (Assetstest, Nodestest) = read(testpath).expect("Couldn't Read!");
   let nt = Nodestest.len();
-  let (testmap, testmat) = createadj(Nodestest.clone(), 0.1, nt);
-  let far_test = recommend(testmap.clone());
+  let (testmap, testmat) = adjacent::createadj(Nodestest.clone(), 0.03, nt);
+  let far_test = recommend(testmap.clone(), 1);
+  let key = "\"2/13/2017\", \"Germany\"";
+  let expvalue = "\"2/13/2017\", \"Pacifix ex Japan\"";
+  match far_test.get(key){
+    Some(value) => assert_eq!(value, expvalue), 
+    None => panic!("No key at all!")
+  }
   let testgraph = Graph::new(nt, Nodestest.clone(), testmap.clone(), testmat.clone());
-  let (testpos, testneg) = testgraph.dailyexpect();
+  let (testpos, testneg) = testgraph.dailyexpect(0.0);
   assert_eq!(testneg.iter().map(|(s, v)| (s.as_str(), *v)).collect::<Vec<_>>(), 
-    [("\"11/4/2013\", \"Commodities\"", -0.004334982158052806), ("\"11/4/2013\", \"Emerg Markets Bonds\"", -0.00018130723716086204)]);
-  let risk = testgraph.portfolio();
+  [("\"2/13/2017\", \"Commodities\"", -0.47149904489571054), 
+  ("\"2/13/2017\", \"Emerg Markets\"", -0.02977940328378424), 
+  ("\"2/13/2017\", \"Italy\"", -0.1748501500584068), 
+  ("\"2/13/2017\", \"France\"", -0.016355540693393806), 
+  ("\"2/13/2017\", \"UK\"", -0.08006145084453031)]);
+  testgraph.portfolio();
+  testgraph.groups()
 }
