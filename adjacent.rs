@@ -20,7 +20,9 @@ pub fn createadj(Nodes: Nodes, threshold:f64, n:usize) -> (Edges, Matrix){
         else{
           let corr = (ivalue-jvalue).abs();
           if corr <= threshold {
-            Edges.entry(ilabel.to_string()).or_insert_with(Vec::new).push(jlabel.to_string());
+            Edges.entry(ilabel.to_string())
+                  .or_insert_with(Vec::new)
+                  .push(jlabel.to_string());
             Matrix[i][j] = true;
           }
         }

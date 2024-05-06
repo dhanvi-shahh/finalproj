@@ -43,12 +43,17 @@ fn recommend(Edges: Edges, risklevel:i32) -> HashMap<String, String>{
   let mut farneigh: HashMap<String, String> = HashMap::new();
   for asset in Edges.keys(){
     let original:String = asset.to_string(); 
-    let mut step: String = Edges[&original].choose(&mut rand::thread_rng()).unwrap().to_string();
+    let mut step: String = Edges[&original]
+                          .choose(&mut rand::thread_rng())
+                          .unwrap()
+                          .to_string();
     let mut current = step.clone();
     let mut visitedneigh: Vec<String> = Vec::new();
     visitedneigh.push(current.clone());
     for _ in 0..risklevel{
-      step = Edges[&current].choose(&mut rand::thread_rng()).unwrap().to_string();
+      step = Edges[&current].choose(&mut rand::thread_rng())
+                            .unwrap().
+                            to_string();
       if Edges.contains_key(&step) && !visitedneigh.contains(&step){
         current = step.clone();
         visitedneigh.push(current.clone());
@@ -63,9 +68,13 @@ fn main() {
   let path = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\project\daily_asset_prices.csv";
   let (_Assetprices, Nodes) = read(path).expect("Couldn't Read!");
   let n = Nodes.len();
+  println!("Nodes in Graph: {}", n);
   let (adjmap, adjmat) = adjacent::createadj(Nodes.clone(), 0.1, n);
   let far = recommend(adjmap.clone(), 7);
-  let mut graph = Graph::new(n, Nodes.clone(), adjmap.clone(), adjmat.clone());
+  let mut graph = Graph::new(n, 
+                              Nodes.clone(), 
+                              adjmap.clone(), 
+                              adjmat.clone());
   let graph = graph.undirected();
   let (positive, negative) = graph.dailyexpect(0.0);
   graph.portfolio();
