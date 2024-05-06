@@ -68,7 +68,6 @@ fn main() {
   let path = r"C:\Users\dhanv\OneDrive\Desktop\2023-2024\Spring 24\DS 210\project\daily_asset_prices.csv";
   let (_Assetprices, Nodes) = read(path).expect("Couldn't Read!");
   let n = Nodes.len();
-  println!("Nodes in Graph: {}", n);
   let (adjmap, adjmat) = adjacent::createadj(Nodes.clone(), 0.1, n);
   let far = recommend(adjmap.clone(), 7);
   let mut graph = Graph::new(n, 
